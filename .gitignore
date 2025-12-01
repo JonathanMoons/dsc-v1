@@ -1,0 +1,40 @@
+# DSC Compiled MOF files
+*.mof
+
+# Output and temporary files
+out/
+temp/
+Temp/
+
+# Log files
+*.log
+*.txt
+
+# Package files
+*.zip
+
+# PowerShell module cache
+*.psm1.cache
+
+# Azure credentials and secrets
+*.publishsettings
+.azure/
+
+# Visual Studio Code
+.vscode/
+*.code-workspace
+
+# Windows thumbnail cache
+Thumbs.db
+Desktop.ini
+
+# macOS
+.DS_Store
+
+# Backup files
+*.bak
+*~
+
+# Test results
+TestResults/
+*.trx
