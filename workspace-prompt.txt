@@ -5,7 +5,7 @@ Context summary for future workspace sessions:
 - Provide automation scripts to compile MOF, package Guest Configuration zip, deploy policy, validate locally, and debug.
 
 2. Current assets (in dsc-v1-staging)
-- TRMOFIssueNew.ps1: DSC v1 Script resource ensuring SQL Windows login exists/enabled. Uses PSDscResources and SqlServer module. Includes Get/Test/Set blocks with Invoke-Sqlcmd helper, references $using:SQLServiceUsername, Node defaults to localhost.
+- ContosoMOFIssueNew.ps1: DSC v1 Script resource ensuring SQL Windows login exists/enabled. Uses PSDscResources and SqlServer module. Includes Get/Test/Set blocks with Invoke-Sqlcmd helper, references $using:SQLServiceUsername, Node defaults to localhost.
 - CreateTrackerMOF.ps1: PowerShell 5.1 script (#requires), ensures PSDscResources 2.12.0.0 installed via helper, compiles MOF to out/.
 - PackageTrackerConfig.ps1: PowerShell 7 script (#requires), ensures PSDscResources 2.12.0.0 and SqlServer (>=21.1.18256) installed, runs New-GuestConfigurationPackage, validates with Get-GuestConfigurationPackageComplianceStatus, optional Start-GuestConfigurationPackageRemediation when -RunLocalRemediation provided, produces artifacts/TrackerDSC2019SFTP-<version>.zip.
 - README.md: Documents prerequisites, exact commands for steps, troubleshooting tips (gc.exe blocking, module installs, logs).

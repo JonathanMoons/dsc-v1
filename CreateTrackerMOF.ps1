@@ -5,7 +5,7 @@
 
 .DESCRIPTION
     Run this script in **Windows PowerShell 5.1** before packaging the configuration for Azure Machine Configuration.
-    The script imports the configuration definition from TRMOFIssueNew.ps1, prompts for any required parameters,
+    The script imports the configuration definition from ContosoMOFIssueNew.ps1, prompts for any required parameters,
     and emits the MOF under the local `out` folder beside the script.
 
 .NOTES
@@ -77,7 +77,7 @@ foreach ($requirement in $moduleRequirements) {
 Write-Host "=== TrackerDSC2019SFTP :: MOF Compilation (PowerShell 5.1) ===" -ForegroundColor Cyan
 
 $scriptRoot = $PSScriptRoot
-$configPath = Join-Path $scriptRoot 'TRMOFIssueNew.ps1'
+$configPath = Join-Path $scriptRoot 'ContosoMOFIssueNew.ps1'
 $outFolder  = Join-Path $scriptRoot 'out'
 
 if (-not (Test-Path $configPath)) {
