@@ -1,4 +1,4 @@
-# TrackerDSC2019SFTP Authoring Guide
+# DSC v1 Authoring Guide
 
 ## Prerequisites
 - **PowerShell versions**
