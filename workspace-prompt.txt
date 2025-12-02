@@ -8,12 +8,13 @@ Context summary for future workspace sessions:
 - ContosoMOFIssueNew.ps1: DSC v1 Script resource ensuring SQL Windows login exists/enabled. Uses PSDscResources and SqlServer module. Includes Get/Test/Set blocks with Invoke-Sqlcmd helper, references $using:SQLServiceUsername, Node defaults to localhost.
 - CreateTrackerMOF.ps1: PowerShell 5.1 script (#requires), ensures PSDscResources 2.12.0.0 installed via helper, compiles MOF to out/.
 - PackageTrackerConfig.ps1: PowerShell 7 script (#requires), ensures PSDscResources 2.12.0.0 and SqlServer (>=21.1.18256) installed, runs New-GuestConfigurationPackage, validates with Get-GuestConfigurationPackageComplianceStatus, optional Start-GuestConfigurationPackageRemediation when -RunLocalRemediation provided, produces artifacts/TrackerDSC2019SFTP-<version>.zip.
+- DeployTrackerPolicy.ps1: PowerShell 7 script that installs Az/GuestConfiguration modules as needed, uploads the zip to storage, generates the policy JSON (New-GuestConfigurationPolicy), publishes it, and assigns it with a system-assigned identity.
+- ValidateTrackerConfig.ps1: Windows PowerShell 5.1 helper that installs PSDscResources + SqlServer modules, runs Test-DscConfiguration against out/<NodeName>.mof, and optionally remediates locally.
+- DebugTrackerStatus.ps1: PowerShell 7 diagnostic script that queries Get-AzPolicyState, Search-AzGraph, and Get-AzGuestConfigurationAssignment for compliance insight.
 - README.md: Documents prerequisites, exact commands for steps, troubleshooting tips (gc.exe blocking, module installs, logs).
 
 3. Outstanding work
-- DeployTrackerPolicy.ps1: helper to upload package, create Guest Configuration definition + policy assignment placeholders.
-- ValidateTrackerConfig.ps1: optional local Start-DscConfiguration validation using MOF.
-- DebugTrackerStatus.ps1: inspect Azure policy compliance state and VM guest assignment.
+- None. Focus on iterating the configuration/policy as requirements evolve.
 
 4. Known issues / environment notes
 - Company security tools may block GuestConfiguration gc.exe; local compliance tests might need alternate machine or allow-list.
@@ -23,6 +24,6 @@ Context summary for future workspace sessions:
 5. Usage reminders
 - Run CreateTrackerMOF.ps1 in Windows PowerShell 5.1.
 - Run PackageTrackerConfig.ps1 in pwsh 7+, use -Force to overwrite existing zip, -RunLocalRemediation only when AssignmentType=AuditAndSet.
-- After package creation, upload zip and deploy policy (script pending).
+- After package creation, run DeployTrackerPolicy.ps1 to publish + assign, then DebugTrackerStatus.ps1 to monitor.
 
 Provide this prompt to new workspace session so assistant can pick up from here.
