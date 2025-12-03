@@ -1,5 +1,5 @@
 #requires -Version 5.1
-<#
+<#!/**/ 
 .SYNOPSIS
     Compiles the ContosoSqlLogin configuration to a MOF file.
 

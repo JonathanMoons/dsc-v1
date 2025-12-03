@@ -2,11 +2,11 @@
 #requires -Modules Az.Accounts, Az.Resources, Az.Storage, GuestConfiguration
 <#!
 .SYNOPSIS
-    Uploads the Contoso tracker Guest Configuration package to Azure Storage, generates an Azure Policy definition,
+    Uploads the ContosoSqlLogin Guest Configuration package to Azure Storage, generates an Azure Policy definition,
     and assigns it so Azure Machine Configuration can deploy/remediate the package.
 
 .DESCRIPTION
-    Run this script in PowerShell 7 from a machine that already compiled the MOF (CreateTrackerMOF.ps1) and produced
+    Run this script in PowerShell 7 from a machine that already compiled the MOF (CreateSqlLoginMOF.ps1) and produced
     a package (PackageTrackerConfig.ps1). The script performs the following steps:
       1. Ensures the required Az and GuestConfiguration modules are present (installs into CurrentUser if missing).
       2. Uploads the specified package ZIP to the target storage account/container.
@@ -19,9 +19,9 @@
     a central automation account, adapt the script as needed.
 
 .EXAMPLE
-    pwsh ./DeployTrackerPolicy.ps1 -SubscriptionId '<sub-guid>' -ResourceGroupName 'rg-tracker' \
-        -StorageAccountName 'trackerconfigstore' -StorageContainerName 'guestconfig' \
-        -PolicyDefinitionName 'TrackerDSC2019SFTP' -PolicyAssignmentName 'TrackerDSC2019SFTP-Assignment'
+    pwsh ./DeployTrackerPolicy.ps1 -SubscriptionId '<sub-guid>' -ResourceGroupName 'rg-contoso-sql' \
+        -StorageAccountName 'contososqllogin' -StorageContainerName 'guestconfig' \
+        -PolicyDefinitionName 'ContosoSqlLogin' -PolicyAssignmentName 'ContosoSqlLogin-Assignment'
 #>
 [CmdletBinding(SupportsShouldProcess)]
 param(
@@ -41,20 +41,20 @@ param(
     [string] $PackagePath,
 
     [Parameter()]
-    [string] $ConfigurationName = 'TrackerDSC2019SFTP',
+    [string] $ConfigurationName = 'ContosoSqlLogin',
 
     [Parameter()]
     [ValidateSet('Audit', 'AuditAndSet')]
     [string] $AssignmentType = 'AuditAndSet',
 
     [Parameter()]
-    [string] $PolicyDefinitionName = 'TrackerDSC2019SFTP',
+    [string] $PolicyDefinitionName = 'ContosoSqlLogin',
 
     [Parameter()]
-    [string] $PolicyAssignmentName = 'TrackerDSC2019SFTP-Assignment',
+    [string] $PolicyAssignmentName = 'ContosoSqlLogin-Assignment',
 
     [Parameter()]
-    [string] $PolicyDisplayName = 'TrackerDSC2019SFTP Guest Configuration',
+    [string] $PolicyDisplayName = 'ContosoSqlLogin Guest Configuration',
 
     [Parameter()]
     [string] $PolicyDescription = 'Ensures the Contoso SQL service account exists and stays enabled on managed hosts.',
@@ -72,10 +72,25 @@ param(
     [string] $Location = 'eastus',
 
     [Parameter()]
+    [ValidateSet('Standard_LRS','Standard_GRS','Standard_RAGRS','Standard_ZRS','Premium_LRS','Premium_ZRS','Standard_GZRS','Standard_RAGZRS')]
+    [string] $StorageSkuName = 'Standard_LRS',
+
+    [Parameter()]
+    [ValidateSet('StorageV2','Storage','BlobStorage','BlockBlobStorage','FileStorage')]
+    [string] $StorageKind = 'StorageV2',
+
+    [Parameter()]
     [switch] $UseSystemAssignedIdentity,
 
     [Parameter()]
-    [string] $ManagedIdentityResourceId
+    [string] $ManagedIdentityResourceId,
+
+    [Parameter()]
+    [switch] $DisableBlobSas,
+
+    [Parameter()]
+    [ValidateRange(1, 8760)]
+    [int] $BlobSasExpiryHours = 720
 )
 
 Set-StrictMode -Version Latest
@@ -123,7 +138,17 @@ $moduleRequirements = @(
 
 foreach ($module in $moduleRequirements) {
     Ensure-Module @module
-    Import-Module $module.Name -ErrorAction Stop | Out-Null
+    if (-not (Get-Module -Name $module.Name -ErrorAction SilentlyContinue)) {
+        try {
+            Import-Module $module.Name -ErrorAction Stop | Out-Null
+        } catch [System.IO.FileLoadException] {
+            Write-Verbose "Module $($module.Name) reported an assembly load conflict but is already available. Continuing."
+        } catch {
+            throw
+        }
+    } else {
+        Write-Verbose "Module $($module.Name) already imported; skipping re-import."
+    }
 }
 
 if (-not $PackagePath) {
@@ -156,7 +181,28 @@ if ($context.Subscription.Id -ne $SubscriptionId) {
     Set-AzContext -SubscriptionId $SubscriptionId -ErrorAction Stop | Out-Null
 }
 
-$storageAccount = Get-AzStorageAccount -ResourceGroupName $ResourceGroupName -Name $StorageAccountName -ErrorAction Stop
+$resourceGroup = Get-AzResourceGroup -Name $ResourceGroupName -ErrorAction SilentlyContinue
+if (-not $resourceGroup) {
+    Write-Host "Creating resource group '$ResourceGroupName' in $Location" -ForegroundColor Yellow
+    $resourceGroup = New-AzResourceGroup -Name $ResourceGroupName -Location $Location -ErrorAction Stop
+}
+
+$storageAccount = Get-AzStorageAccount -ResourceGroupName $ResourceGroupName -Name $StorageAccountName -ErrorAction SilentlyContinue
+if (-not $storageAccount) {
+    Write-Host "Creating storage account '$StorageAccountName' in $ResourceGroupName" -ForegroundColor Yellow
+    $storageParams = @{
+        ResourceGroupName      = $ResourceGroupName
+        Name                   = $StorageAccountName
+        Location               = $Location
+        SkuName                = $StorageSkuName
+        Kind                   = $StorageKind
+        EnableHttpsTrafficOnly = $true
+        AllowBlobPublicAccess  = $false
+    }
+
+    $storageAccount = New-AzStorageAccount @storageParams -ErrorAction Stop
+}
+
 $storageContext = $storageAccount.Context
 $container = Get-AzStorageContainer -Name $StorageContainerName -Context $storageContext -ErrorAction SilentlyContinue
 if (-not $container) {
@@ -166,7 +212,15 @@ if (-not $container) {
 
 Write-Host "Uploading package $PackagePath" -ForegroundColor Cyan
 $blob = Set-AzStorageBlobContent -File $PackagePath -Container $StorageContainerName -Context $storageContext -Force -ErrorAction Stop
+$blobName = $blob.Name
 $contentUri = $blob.ICloudBlob.Uri.AbsoluteUri
+
+if (-not $DisableBlobSas) {
+    $sasExpiry = (Get-Date).AddHours($BlobSasExpiryHours)
+    $contentUri = New-AzStorageBlobSASToken -Container $StorageContainerName -Blob $blobName -Context $storageContext -Permission r -ExpiryTime $sasExpiry -FullUri
+    Write-Verbose "Generated SAS URI for package that expires $sasExpiry."
+}
+
 Write-Host "Package uploaded to $contentUri" -ForegroundColor Green
 
 if (-not (Test-Path $PolicyOutputFolder)) {
@@ -184,7 +238,6 @@ $policyConfig = @{
     Platform      = 'Windows'
     PolicyVersion = $PolicyVersion
     Mode          = $mode
-    Category      = 'Guest Configuration'
 }
 
 if ($UseSystemAssignedIdentity) {
@@ -200,10 +253,23 @@ Write-Host "Generating policy definition files via New-GuestConfigurationPolicy"
 $newPolicy = New-GuestConfigurationPolicy @policyConfig -ErrorAction Stop
 
 $policyFileName = if ($AssignmentType -eq 'Audit') { 'auditIfNotExists.json' } else { 'deployIfNotExists.json' }
-$policyFilePath = Join-Path $PolicyOutputFolder $policyFileName
-if (-not (Test-Path $policyFilePath)) {
-    throw "Expected policy file was not generated: $policyFilePath"
+$policyFile = Get-ChildItem -Path $PolicyOutputFolder -Filter '*.json' -Recurse -ErrorAction SilentlyContinue |
+    Where-Object { $_.Name -ieq $policyFileName } |
+    Select-Object -First 1
+
+if (-not $policyFile) {
+    $policyFile = Get-ChildItem -Path $PolicyOutputFolder -Filter '*.json' -Recurse -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -like "*$($policyFileName.TrimEnd('.json'))*" } |
+        Select-Object -First 1
 }
+
+if (-not $policyFile) {
+    $available = (Get-ChildItem -Path $PolicyOutputFolder -Filter '*.json' -Recurse -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName)
+    $availableText = if ($available) { ($available -join [Environment]::NewLine) } else { '<none>' }
+    throw "Expected policy file '$policyFileName' was not generated under $PolicyOutputFolder. Found: $availableText"
+}
+
+$policyFilePath = $policyFile.FullName
 
 Write-Host "Publishing Azure Policy definition $PolicyDefinitionName" -ForegroundColor Cyan
 $definition = New-AzPolicyDefinition -Name $PolicyDefinitionName -DisplayName $PolicyDisplayName `

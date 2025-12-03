@@ -1,16 +1,16 @@
 Context summary for future workspace sessions:
 
 1. Goal
-- Manage TrackerDSC2019SFTP DSC configuration for Azure Machine Configuration.
-- Provide automation scripts to compile MOF, package Guest Configuration zip, deploy policy, validate locally, and debug.
+- Manage the ContosoSqlLogin DSC configuration for Azure Machine Configuration.
+- Provide automation scripts to compile MOFs, package Guest Configuration ZIPs, deploy policy, validate locally, and debug.
 
 2. Current assets (in dsc-v1-staging)
 - ContosoMOFIssueNew.ps1: DSC v1 Script resource ensuring SQL Windows login exists/enabled. Uses PSDscResources and SqlServer module. Includes Get/Test/Set blocks with Invoke-Sqlcmd helper, references $using:SQLServiceUsername, Node defaults to localhost.
-- CreateTrackerMOF.ps1: PowerShell 5.1 script (#requires), ensures PSDscResources 2.12.0.0 installed via helper, compiles MOF to out/.
-- PackageTrackerConfig.ps1: PowerShell 7 script (#requires), ensures PSDscResources 2.12.0.0 and SqlServer (>=21.1.18256) installed, runs New-GuestConfigurationPackage, validates with Get-GuestConfigurationPackageComplianceStatus, optional Start-GuestConfigurationPackageRemediation when -RunLocalRemediation provided, produces artifacts/TrackerDSC2019SFTP-<version>.zip.
-- DeployTrackerPolicy.ps1: PowerShell 7 script that installs Az/GuestConfiguration modules as needed, uploads the zip to storage, generates the policy JSON (New-GuestConfigurationPolicy), publishes it, and assigns it with a system-assigned identity.
-- ValidateTrackerConfig.ps1: Windows PowerShell 5.1 helper that installs PSDscResources + SqlServer modules, runs Test-DscConfiguration against out/<NodeName>.mof, and optionally remediates locally.
-- DebugTrackerStatus.ps1: PowerShell 7 diagnostic script that queries Get-AzPolicyState, Search-AzGraph, and Get-AzGuestConfigurationAssignment for compliance insight.
+- CreateSqlLoginMOF.ps1: Windows PowerShell 5.1 entry point (#requires) that auto-installs PSDscResources 2.12.0.0 and compiles ContosoSqlLogin to out/. CreateTrackerMOF.ps1 remains temporarily for compatibility.
+- PackageTrackerConfig.ps1: PowerShell 7 script (#requires) that ensures PSDscResources 2.12.0.0, SqlServer (>=21.1.18256), and GuestConfiguration (>=3.13.0) are present, runs New-GuestConfigurationPackage, optionally clears gcworker cache + validates with Get-GuestConfigurationPackageComplianceStatus, supports -RunLocalRemediation and -SkipComplianceTest, emits artifacts/ContosoSqlLogin-<version>.zip.
+- DeployTrackerPolicy.ps1: PowerShell 7 automation that installs Az + GuestConfiguration modules, uploads the package (autocreates RG/storage/container), generates policy JSON, publishes definition, and assigns with system-assigned identity unless -ManagedIdentityResourceId or -UseSystemAssignedIdentity toggles are supplied. Supports SAS suppression via -DisableBlobSas and custom scopes.
+- ValidateTrackerConfig.ps1: Windows PowerShell 5.1 helper installing PSDscResources + SqlServer, running Test-DscConfiguration against out/<NodeName>.mof, with -Remediate and -SkipStatus switches; missing-MOF guidance points back to CreateSqlLoginMOF.
+- DebugTrackerStatus.ps1: PowerShell 7 diagnostics pulling Get-AzPolicyState, Search-AzGraph, and Get-AzGuestConfigurationAssignment data with -IncludeCompliant and per-VM lookup options.
 - README.md: Documents prerequisites, exact commands for steps, troubleshooting tips (gc.exe blocking, module installs, logs).
 
 3. Outstanding work
@@ -20,10 +20,11 @@ Context summary for future workspace sessions:
 - Company security tools may block GuestConfiguration gc.exe; local compliance tests might need alternate machine or allow-list.
 - Module versions matter: PSDscResources 2.12.0.0 embedded; SqlServer module required on testing machine.
 - Packaging validation log locations: %USERPROFILE%\Documents\PowerShell\Modules\GuestConfiguration\<version>\gcworker\logs and %ProgramData%\GuestConfig.
+- Deploy script autogenerates SAS URIs unless -DisableBlobSas is used; ensure expiry (default 720 hours) aligns with security policy.
 
 5. Usage reminders
-- Run CreateTrackerMOF.ps1 in Windows PowerShell 5.1.
-- Run PackageTrackerConfig.ps1 in pwsh 7+, use -Force to overwrite existing zip, -RunLocalRemediation only when AssignmentType=AuditAndSet.
-- After package creation, run DeployTrackerPolicy.ps1 to publish + assign, then DebugTrackerStatus.ps1 to monitor.
+- Run CreateSqlLoginMOF.ps1 in Windows PowerShell 5.1 (CreateTrackerMOF.ps1 only if legacy tooling depends on it).
+- Run PackageTrackerConfig.ps1 in pwsh 7+, use -Force to overwrite existing zip, -RunLocalRemediation only when AssignmentType=AuditAndSet, add -SkipComplianceTest if `gc.exe` is blocked.
+- After package creation, run DeployTrackerPolicy.ps1 to publish + assign, then DebugTrackerStatus.ps1 to monitor or spot-check compliance via -ResourceGroupName/-VmName.
 
 Provide this prompt to new workspace session so assistant can pick up from here.

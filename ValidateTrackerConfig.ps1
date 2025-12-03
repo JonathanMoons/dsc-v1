@@ -1,10 +1,10 @@
 #requires -Version 5.1
 <#!
 .SYNOPSIS
-    Runs Test/Start-DscConfiguration against the TrackerDSC2019SFTP MOF on a Windows Server VM.
+    Runs Test/Start-DscConfiguration against the ContosoSqlLogin MOF on a Windows Server VM.
 
 .DESCRIPTION
-    Use this helper after compiling the MOF (CreateTrackerMOF.ps1) to validate or remediate a machine locally
+    Use this helper after compiling the MOF (CreateSqlLoginMOF.ps1) to validate or remediate a machine locally
     before packaging or assigning through Azure Policy. The script:
       * Ensures the PSDscResources and SqlServer modules are available (matching the configuration requirements).
       * Loads the compiled MOF from the out/ folder (or a custom path).
@@ -16,12 +16,12 @@
     powershell.exe -File ./ValidateTrackerConfig.ps1 -NodeName 'localhost'
 
 .EXAMPLE
-    powershell.exe -File ./ValidateTrackerConfig.ps1 -MofFolder 'C:/temp/out' -NodeName 'TrackerVM' -Remediate
+    powershell.exe -File ./ValidateTrackerConfig.ps1 -MofFolder 'C:/temp/out' -NodeName 'SqlLoginVM' -Remediate
 #>
 [CmdletBinding()]
 param(
     [Parameter()]
-    [string] $MofFolder = (Join-Path $PSScriptRoot 'out'),
+    [string] $MofFolder,
 
     [Parameter()]
     [string] $NodeName = 'localhost',
@@ -34,6 +34,18 @@ param(
 )
 
 Set-StrictMode -Version Latest
+
+$scriptRoot = if ($PSCommandPath) {
+    Split-Path -Parent $PSCommandPath
+} elseif ($PSScriptRoot) {
+    $PSScriptRoot
+} else {
+    (Get-Location).ProviderPath
+}
+
+if (-not $MofFolder) {
+    $MofFolder = Join-Path $scriptRoot 'out'
+}
 
 function Ensure-Module {
     param(
@@ -70,8 +82,8 @@ function Ensure-Module {
 }
 
 $moduleRequirements = @(
-    @{ Name = 'PSDscResources'; RequiredVersion = [Version]'2.12.0.0' },
-    @{ Name = 'SqlServer';      MinimumVersion = [Version]'21.1.18256' }
+    @{ Name = 'PSDscResources'; RequiredVersion = [Version]'2.12.0.0'; Scope = 'AllUsers' },
+    @{ Name = 'SqlServer';      MinimumVersion = [Version]'21.1.18256'; Scope = 'AllUsers' }
 )
 
 foreach ($module in $moduleRequirements) {
@@ -85,7 +97,7 @@ if (-not (Test-Path $MofFolder)) {
 
 $mofPath = Join-Path $MofFolder ("{0}.mof" -f $NodeName)
 if (-not (Test-Path $mofPath)) {
-    throw "MOF for node '$NodeName' not found at $mofPath. Re-run CreateTrackerMOF.ps1."
+    throw "MOF for node '$NodeName' not found at $mofPath. Re-run CreateSqlLoginMOF.ps1."
 }
 
 Write-Host "Testing DSC configuration at $MofFolder" -ForegroundColor Cyan
@@ -99,7 +111,7 @@ if ($null -ne $testResult) {
 if ($inDesiredState) {
     Write-Host "Node '$NodeName' is already compliant." -ForegroundColor Green
 } else {
-    Write-Warning "Node '$NodeName' is NOT compliant with TrackerDSC2019SFTP."
+    Write-Warning "Node '$NodeName' is NOT compliant with ContosoSqlLogin."
 }
 
 if ($Remediate) {

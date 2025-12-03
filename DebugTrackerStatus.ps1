@@ -3,7 +3,7 @@
 <#!
 .SYNOPSIS
     Provides quick visibility into Azure Policy compliance state and guest configuration assignment health
-    for the Contoso TrackerDSC2019SFTP package.
+    for the ContosoSqlLogin package.
 
 .DESCRIPTION
     Use this script from any PowerShell 7 session that can authenticate to Azure. It ensures the Az modules
@@ -13,10 +13,10 @@
       * A Resource Graph summary of machines failing the assignment and their reason phrases.
 
 .EXAMPLE
-    pwsh ./DebugTrackerStatus.ps1 -SubscriptionId '<sub-guid>' -PolicyAssignmentName 'TrackerDSC2019SFTP-Assignment'
+    pwsh ./DebugTrackerStatus.ps1 -SubscriptionId '<sub-guid>' -PolicyAssignmentName 'ContosoSqlLogin-Assignment'
 
 .EXAMPLE
-    pwsh ./DebugTrackerStatus.ps1 -SubscriptionId '<sub-guid>' -ResourceGroupName 'rg-tracker' -VmName 'tracker-vm01'
+    pwsh ./DebugTrackerStatus.ps1 -SubscriptionId '<sub-guid>' -ResourceGroupName 'rg-contoso-sql' -VmName 'sql-login-vm01'
 #>
 [CmdletBinding()]
 param(
@@ -24,10 +24,10 @@ param(
     [string] $SubscriptionId,
 
     [Parameter()]
-    [string] $PolicyAssignmentName = 'TrackerDSC2019SFTP-Assignment',
+    [string] $PolicyAssignmentName = 'ContosoSqlLogin-Assignment',
 
     [Parameter()]
-    [string] $ConfigurationName = 'TrackerDSC2019SFTP',
+    [string] $ConfigurationName = 'ContosoSqlLogin',
 
     [Parameter()]
     [string] $ResourceGroupName,
