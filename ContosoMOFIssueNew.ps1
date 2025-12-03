@@ -1,7 +1,7 @@
 #requires -Version 5.1
 Set-StrictMode -Version Latest
 
-Configuration TrackerDSC2019SFTP {
+Configuration ContosoSqlLogin {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)]
@@ -39,9 +39,9 @@ Configuration TrackerDSC2019SFTP {
                 }
 
                 try {
-                    $probeQuery = @"
+                    $probeQuery = @'
 SELECT name, create_date, is_disabled FROM sys.server_principals WHERE name = N'$(LoginName)'
-"@
+'@
 
                     $result = Invoke-ContosoSqlQuery -Query $probeQuery
                     if ($null -ne $result) {
@@ -77,9 +77,9 @@ SELECT name, create_date, is_disabled FROM sys.server_principals WHERE name = N'
                         Invoke-Sqlcmd @invokeParams -Query $Query
                     }
 
-                    $testQuery = @"
+                    $testQuery = @'
 SELECT name FROM sys.server_principals WHERE name = N'$(LoginName)'  AND is_disabled = 0
-"@
+'@
 
                     $result = Invoke-ContosoSqlQuery -Query $testQuery
                     return ($null -ne $result)
@@ -114,7 +114,7 @@ SELECT name FROM sys.server_principals WHERE name = N'$(LoginName)'  AND is_disa
                 }
 
                 try {
-                    $setQuery = @"
+                    $setQuery = @'
 DECLARE @login sysname = N'$(LoginName)';
 
 IF EXISTS (SELECT 1 FROM sys.server_principals WHERE name = @login)
@@ -130,7 +130,7 @@ BEGIN
     DECLARE @create nvarchar(512) = N'CREATE LOGIN ' + QUOTENAME(@login) + N' FROM WINDOWS;';
     EXEC (@create);
 END
-"@
+'@
 
                     Invoke-ContosoSqlQuery -Query $setQuery
                 } catch {
