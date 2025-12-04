@@ -11,6 +11,15 @@
 - PSGallery access to download modules (or pre-stage the modules in your module path).
 - Ability to run elevated PowerShell when testing packages (the Guest Configuration agent writes under `%ProgramData%\GuestConfig` and may be blocked by endpoint protection if not allowed).
 
+## File Map (execution order)
+1. **ContosoSqlLoginRsrc.ps1** – the DSC configuration definition (`Configuration ContosoSqlLogin`) that creates/enforces the SQL login. Every subsequent step consumes the MOF compiled from this file.
+2. **CreateSqlLoginMOF.ps1** – Windows PowerShell 5.1 entry point that imports `ContosoSqlLoginRsrc.ps1`, installs `PSDscResources`, and emits the node-specific MOF into `out/`. `CreateTrackerMOF.ps1` remains only for legacy workflows still referencing the old name.
+3. **ValidateTrackerConfig.ps1** – optional local validation/remediation helper that runs `Test-DscConfiguration`/`Start-DscConfiguration` on the freshly compiled MOF before you package it.
+4. **PackageTrackerConfig.ps1** – PowerShell 7 packager that bundles the MOF into a Guest Configuration ZIP, runs the local compliance test (unless `-SkipComplianceTest`), and optionally performs local remediation.
+5. **DeployTrackerPolicy.ps1** – publishes the latest ZIP to Azure Storage, generates the Guest Configuration policy JSON, creates/updates the Azure Policy definition, and assigns it at the requested scope.
+6. **DebugTrackerStatus.ps1** – post-deployment monitoring utility that queries Azure Policy states, Resource Graph results, and per-VM guest configuration assignments to surface non-compliance.
+7. **README.md / workspace-prompt.txt** – living documentation and recap of the workflow; update these when you adjust any of the scripts so future sessions stay in sync.
+
 ## Step 1 – Compile the MOF (PowerShell 5.1)
 ```powershell
 powershell.exe -File .\CreateSqlLoginMOF.ps1 -SQLServiceUsername 'apolloAdmin' -NodeName 'localhost'
