@@ -1,5 +1,4 @@
 #requires -Version 7.0
-#requires -Modules GuestConfiguration
 <#
 .SYNOPSIS
     Packages the ContosoSqlLogin configuration into a Guest Configuration ZIP and validates it.

@@ -78,7 +78,7 @@ function Ensure-Module {
     }
 
     Write-Host "Installing module $Name" -ForegroundColor Yellow
-    Install-Module @params -ErrorAction Stop
+    Install-Module @params -AllowClobber -ErrorAction Stop
 }
 
 $moduleRequirements = @(
