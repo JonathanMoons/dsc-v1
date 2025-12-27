@@ -2,8 +2,8 @@
 
 ## Prerequisites
 - **PowerShell versions**
-  - Windows PowerShell 5.1 (`powershell.exe`) for compilation.
-  - PowerShell 7+ (`pwsh`) for packaging and validation.
+  - Windows PowerShell 5.1 (`powershell.exe`) for compilation and any local DSC validation/remediation.
+  - PowerShell 7+ (`pwsh`) for packaging, Azure deployment, and monitoring scripts.
 - **Modules (installed automatically if missing when you run the scripts)**
   - `PSDscResources` version **2.12.0.0** – required during MOF compilation and embedded inside the package.
   - `GuestConfiguration` module – already declared via `#requires` in `PackageTrackerConfig.ps1`.
@@ -29,7 +29,19 @@ powershell.exe -File .\CreateSqlLoginMOF.ps1 -SQLServiceUsername 'apolloAdmin' -
 - Outputs MOF files under `out/`. Delete or archive previous MOFs if you want a clean run.
 - `CreateTrackerMOF.ps1` remains for backward compatibility but will eventually be removed once everything points to the new name.
 
-## Step 2 – Package and Validate (PowerShell 7)
+## Step 2 – Validate Locally (PowerShell 5.1, optional but recommended)
+Run this step immediately after compiling the MOF to confirm the DSC resource succeeds before you invest time in packaging.
+
+```powershell
+powershell.exe -File .\ValidateTrackerConfig.ps1 -NodeName 'localhost' [-Remediate]
+```
+
+- Requires Windows PowerShell 5.1 because `Test-DscConfiguration` and the Script resource run in the full DSC engine.
+- Installs `PSDscResources` 2.12.0.0 and `SqlServer` (>=21.1.18256) into the **AllUsers** scope if they are missing and then imports them so `MSFT_ScriptResource` is available.
+- Executes `Test-DscConfiguration` against the compiled MOF and reports compliance. Add `-Remediate` to run `Start-DscConfiguration` locally, or `-SkipStatus` to suppress the DSC status table.
+- Errors that mention a missing MOF will point you back to `CreateSqlLoginMOF.ps1`; re-run the compile step there to regenerate the MOF.
+
+## Step 3 – Package and Validate (PowerShell 7)
 ```powershell
 pwsh -File .\PackageTrackerConfig.ps1 -ConfigurationName ContosoSqlLogin -NodeName 'localhost' \
   -PackageVersion 1.0.0 -AssignmentType AuditAndSet [-Force] [-RunLocalRemediation] [-SkipComplianceTest]
@@ -40,18 +52,6 @@ pwsh -File .\PackageTrackerConfig.ps1 -ConfigurationName ContosoSqlLogin -NodeNa
 - Add `-RunLocalRemediation` to call `Start-GuestConfigurationPackageRemediation` (only valid for `AuditAndSet`). Run this step from an elevated console and ensure security tools allow `gc.exe` located under the GuestConfiguration module folder.
 - Use `-SkipComplianceTest` when Defender/EDR tools block access to `%USERPROFILE%\Documents\PowerShell\Modules\GuestConfiguration`. When the test runs, the script clears the `gcworker\packages` cache to avoid access denied issues on re-runs.
 - Logs for compliance tests are written under `%USERPROFILE%\Documents\PowerShell\Modules\GuestConfiguration\<version>\gcworker\logs` and `%ProgramData%\GuestConfig`.
-
-## Step 3 – Validate Locally (optional but recommended)
-Run this step on the Azure VM (or authoring machine) where the MOF was compiled to confirm the DSC resource succeeds before packaging again.
-
-```powershell
-powershell.exe -File .\ValidateTrackerConfig.ps1 -NodeName 'localhost' [-Remediate]
-```
-
-- Installs `PSDscResources` 2.12.0.0 and `SqlServer` (>=21.1.18256) if they are missing.
-- Executes `Test-DscConfiguration` against the compiled MOF and reports compliance.
-- Add `-Remediate` to run `Start-DscConfiguration` locally, or `-SkipStatus` to suppress the DSC status table.
-- Errors that mention a missing MOF will now point you back to `CreateSqlLoginMOF.ps1`; re-run the compile step there to regenerate the MOF.
 
 ## Step 4 – Publish Package + Assign Azure Policy
 Use PowerShell 7 on a machine that can reach Azure (the same VM works) and authenticate with `Connect-AzAccount`.
